@@ -107,6 +107,9 @@
             <option v-for="s in regions" v-bind:value="s">
               {{ s }}
             </option>
+			<option value='BR'>
+				BR
+			</option>
           </select>
 
           <select v-model="selectedScale" @mousedown="pause">

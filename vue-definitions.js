@@ -81,7 +81,6 @@ Vue.component('graph', {
         x: e.cases,
         y: e.slope,
         name: e.country,
-        //text: this.dates.map(date => e.country + '<br>' + this.formatDate(date) ),
         text: this.dates.map(date => e.country + '<br>' + date ),
         mode: showDailyMarkers ? 'lines+markers' : 'lines',
         type: 'scatter',
@@ -134,7 +133,6 @@ Vue.component('graph', {
       }
 
       this.layout = {
-        //title: 'Trajectory of COVID-19 '+ this.selectedData + ' (' + this.formatDate(this.dates[this.day - 1]) + ')',
         title: 'Trajectory of COVID-19 '+ this.selectedData + ' (' + this.dates[this.day - 1] + ')',
         showlegend: false,
         xaxis: {
@@ -196,7 +194,7 @@ Vue.component('graph', {
     },
 
     setxrange() {
-      let xmax = Math.max(...this.filteredCases, 50);
+      let xmax = Math.max(...this.filteredCases, 10);
 
       if (this.scale == 'Logarithmic Scale') {
         this.xrange = [1, Math.ceil(Math.log10(1.5*xmax))]
@@ -207,7 +205,7 @@ Vue.component('graph', {
     },
 
     setyrange() {
-      let ymax = Math.max(...this.filteredSlope, 50);
+      let ymax = Math.max(...this.filteredSlope, 10);
       let ymin = Math.min(...this.filteredSlope);
 
       if (this.scale == 'Logarithmic Scale') {
@@ -404,12 +402,8 @@ let app = new Vue({
     },
 
     graphMounted() {
-      //console.log('minDay', this.minDay);
-      //console.log('autoPlay', this.autoplay);
-      //console.log('graphMounted', this.graphMounted);
 
       if (this.graphMounted && this.autoplay && this.minDay > 0) {
-        //console.log('autoplaying');
         this.day = this.minDay;
         this.play();
         this.autoplay = false; // disable autoplay on first play
@@ -465,8 +459,8 @@ let app = new Vue({
     },
 
     pullData(selectedData, selectedRegion, updateSelectedCountries = true) {
-      //console.log('pulling', selectedData, ' for ', selectedRegion);
-      if (selectedRegion != 'US') {
+      console.log('pulling', selectedData, ' for ', selectedRegion);
+      if (selectedRegion != 'US' && selectedRegion != 'BR') {
         let url;
         if (selectedData == 'Confirmed Cases') {
          url = 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv';
@@ -476,6 +470,10 @@ let app = new Vue({
           return;
         }
         Plotly.d3.csv(url, (data) => this.processData(data, selectedRegion, updateSelectedCountries));
+      } else if (selectedRegion == 'BR') { // selectedRegion == 'BR'
+        const type = (selectedData == 'Reported Deaths') ? 'deaths' : 'cases';
+        const url = 'https://brasil.io/dataset/covid19/caso?format=csv';
+        Plotly.d3.csv(url, (data) => this.processData(this.preprocessBRData(data, type), selectedRegion, updateSelectedCountries));
       } else { // selectedRegion == 'US'
         const type = (selectedData == 'Reported Deaths') ? 'deaths' : 'cases'
         const url = 'https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-states.csv';
@@ -609,6 +607,7 @@ let app = new Vue({
         let st = recastData[e.state]  = (recastData[e.state] || {'Province/State': e.state, 'Country/Region': 'US', 'Lat': null, 'Long': null});
         st[fixNYTDate(e.date)] = parseInt(e[type]);
       });
+	  console.log(Object.values(recastData));
       return Object.values(recastData);
 
       function fixNYTDate(date) {
@@ -616,6 +615,39 @@ let app = new Vue({
         return `${tmp[1]}/${tmp[2]}/${tmp[0].substr(2)}`;
       }
     },
+	
+	preprocessBRData(data, type) {
+	
+	  data = data.sort(Comparator);
+	  console.log(data);
+		
+      let recastData = {};
+      data.forEach(e => {
+        let st = recastData[e.state]  = (recastData[e.state] || {'Province/State': e.state, 'Country/Region': 'BR', 'Lat': null, 'Long': null, 'place_type': null});
+		if (type == 'cases') {
+			type = 'confirmed';
+		}
+        st[fixBRDate(e.date)] = parseInt(e[type]);
+      });
+	  
+	  console.log(Object.values(recastData));
+	  console.log(Object.keys(recastData));
+	  
+      return Object.values(recastData);
+
+      function fixBRDate(date) {
+        let tmp = date.split('-');
+        return `${tmp[1]}/${tmp[2]}/${tmp[0].substr(2)}`;
+      }
+	  
+	  function Comparator(a, b) {
+		if (a.date < b.date) return -1;
+		if (a.date > b.date) return 1;
+		return 0;
+	  }
+	  
+    },
+
 
     play() {
       if (this.paused) {
@@ -803,7 +835,7 @@ let app = new Vue({
 
     selectedScale: 'Logarithmic Scale',
 
-    minCasesInCountry: 50,
+    minCasesInCountry: 10,
 
     dates: [],
 
